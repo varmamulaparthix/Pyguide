@@ -231,7 +231,7 @@ function App() {
         <div className="composer">
           <div className="attachment-control" ref={menuRef}><button className="attach-button" aria-label="Add attachment" aria-expanded={attachmentMenu} onClick={() => setAttachmentMenu((open) => !open)}><Plus /></button>{attachmentMenu && <div className="attachment-menu" role="menu"><button role="menuitem" onClick={selectFiles}><Paperclip /><span>Add photos & files<small>Upload from computer</small></span></button><button role="menuitem" onClick={selectFiles}><FileCode2 /><span>Upload code file<small>Python, JSON, text, and more</small></span></button><button role="menuitem" disabled={!attachments.length} onClick={() => setAttachments([])}><Trash2 /><span>Clear attachments<small>Remove selected files</small></span></button></div>}</div>
           <input ref={inputRef} className="native-file-input" type="file" multiple accept=".py,.txt,.md,.pdf,.csv,.json,.log,.png,.jpg,.jpeg,.webp" onChange={uploadFiles} />
-          <textarea value={text} disabled={loading} onChange={(event) => setText(event.target.value)} onKeyDown={onInputKey} placeholder="Ask anything about Python, coding, errors, or any topic..." />
+          <textarea value={text} disabled={loading} onChange={(event) => setText(event.target.value)} onInput={(event) => { const area = event.currentTarget; area.style.height = "auto"; area.style.height = `${Math.min(area.scrollHeight, 160)}px`; }} onKeyDown={onInputKey} placeholder="Ask anything about Python, coding, errors, or any topic..." />
           <button className="send" aria-label="Send message" title="Send message" disabled={loading || !text.trim()} onClick={send}><Send /></button>
         </div>
       </div>
