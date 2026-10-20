@@ -1,6 +1,6 @@
 import { ChangeEvent, KeyboardEvent as ReactKeyboardEvent, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Archive, ChevronLeft, Copy, Download, FileCode2, FileText, FolderOpen, LogOut, Menu, MoreHorizontal, Paperclip, Pencil, Plus, Search, Send, Settings, Trash2, X } from "lucide-react";
+import { Archive, ChevronLeft, Copy, Download, Eye, EyeOff, FileCode2, FileText, FolderOpen, LogOut, Menu, MoreHorizontal, Paperclip, Pencil, Plus, Search, Send, Settings, Trash2, X } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import "./style.css";
@@ -42,6 +42,9 @@ function App() {
   const [token, setToken] = useState(localStorage.getItem("token") || "");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [authMode, setAuthMode] = useState<"login" | "register">("login");
+  const [showPassword, setShowPassword] = useState(false);
   const [chats, setChats] = useState<Chat[]>([]);
   const [active, setActive] = useState<Chat | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -65,6 +68,13 @@ function App() {
   const [editingText, setEditingText] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const closeOrCollapseSidebar = () => {
+    if (window.matchMedia("(max-width: 1024px)").matches) {
+      setSidebarOpen(false);
+      return;
+    }
+    setSidebarCollapsed((collapsed) => !collapsed);
+  };
 
   const loadChats = async (search = query) => {
     if (!token) return;
@@ -144,6 +154,7 @@ function App() {
     setError("");
     if (!email.includes("@")) return setError("Enter a valid email address.");
     if (password.length < 8) return setError("Password must be at least 8 characters.");
+    if (!login && password !== confirmPassword) return setError("Passwords do not match.");
     try {
       const result = await api(`/auth/${login ? "login" : "register"}`, { method: "POST", body: JSON.stringify({ email, password }) }, "");
       localStorage.setItem("token", result.token); setToken(result.token);
@@ -208,13 +219,13 @@ function App() {
     if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); send(); }
   };
 
-  if (!token) return <div className="login-shell"><section className="login"><div className="login-logo"><FileCode2 /> <b>PyGuide</b></div><h1>Welcome back</h1><p>Sign in to continue learning Python.</p><input type="email" placeholder="Email address" value={email} onChange={(event) => setEmail(event.target.value)} /><input type="password" placeholder="Password (minimum 8 characters)" value={password} onChange={(event) => setPassword(event.target.value)} /><button onClick={() => authenticate(true)}>Log in</button><button className="secondary" onClick={() => authenticate(false)}>Create account</button>{error && <p className="form-error">{error}</p>}</section></div>;
+  if (!token) return <div className="login-shell"><section className="login"><div className="login-logo"><FileCode2 /> <b>PyGuide</b></div><h1>{authMode === "login" ? "Welcome back" : "Create your account"}</h1><p>{authMode === "login" ? "Sign in to continue learning Python." : "Save your chats and learn Python step by step."}</p><label>Email address<input type="email" autoComplete="email" placeholder="you@example.com" value={email} onChange={(event) => setEmail(event.target.value)} /></label><label>Password<div className="password-field"><input type={showPassword ? "text" : "password"} autoComplete={authMode === "login" ? "current-password" : "new-password"} placeholder="At least 8 characters" value={password} onChange={(event) => setPassword(event.target.value)} /><button type="button" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword((visible) => !visible)}>{showPassword ? <EyeOff /> : <Eye />}</button></div></label>{authMode === "register" && <label>Confirm password<input type={showPassword ? "text" : "password"} autoComplete="new-password" placeholder="Enter your password again" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} /></label>}<button onClick={() => authenticate(authMode === "login")}>{authMode === "login" ? "Log in" : "Create account"}</button><button className="secondary" onClick={() => { setAuthMode((mode) => mode === "login" ? "register" : "login"); setError(""); }}>{authMode === "login" ? "Create a new account" : "I already have an account"}</button>{error && <p className="form-error">{error}</p>}</section></div>;
 
   return <div className={`app ${sidebarCollapsed ? "sidebar-is-collapsed" : ""}`}>
     <aside className={`${sidebarOpen ? "open " : ""}${sidebarCollapsed ? "collapsed" : ""}`}>
-      <div className="brand"><div className="brand-mark"><FileCode2 /></div><div className="sidebar-label"><b>PyGuide</b><small>Python Learning Assistant</small></div><button className="icon collapse" title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"} onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}><ChevronLeft /></button></div>
+      <div className="brand"><div className="brand-mark"><FileCode2 /></div><div className="sidebar-label"><b>PyGuide</b><small>Python Learning Assistant</small></div><button className="icon collapse" title="Close sidebar" onClick={closeOrCollapseSidebar}><ChevronLeft /></button></div>
       <button className="new" onClick={newChat}><Plus /> New Chat</button>
-      <nav><button onClick={() => { setActive(null); setMessages([]); }}><FileText /> Home</button><button onClick={() => setText("Explain a Python concept with a simple example.")}><Search /> Explore</button><button onClick={openFiles}><FolderOpen /> Files <span>{storedFiles.length}</span></button><button onClick={openSettings}><Settings /> Settings</button></nav>
+      <nav><button onClick={() => { setActive(null); setMessages([]); setSidebarOpen(false); }}><FileText /> Home</button><button onClick={() => { setText("Explain a Python concept with a simple example."); setSidebarOpen(false); }}><Search /> Explore</button><button onClick={openFiles}><FolderOpen /> Files <span>{storedFiles.length}</span></button><button onClick={openSettings}><Settings /> Settings</button></nav>
       <div className="recent"><h4>Recent Chats</h4>{chats.length ? chats.map((chat) => <div key={chat.id} className={active?.id === chat.id ? "chat-row selected" : "chat-row"}><button className="chat" onClick={() => openChat(chat)}><FileText /><span>{chat.title}</span></button><button className="chat-more" title={`More actions for ${chat.title}`} onClick={(event) => { event.stopPropagation(); const rect = event.currentTarget.getBoundingClientRect(); setChatMenuPosition({ top: Math.min(rect.top, window.innerHeight - 164), left: Math.min(rect.right + 8, window.innerWidth - 170) }); setChatMenu(chat); }}><MoreHorizontal /></button></div>) : <p>No conversations yet.</p>}</div>
       <footer><div className="avatar">{(email || "P").slice(0, 1).toUpperCase()}</div><div><b>{email || "PyGuide user"}</b><small>Signed in</small></div><button className="icon" title="Log out" onClick={() => { localStorage.removeItem("token"); setToken(""); }}><LogOut /></button></footer>
     </aside>
