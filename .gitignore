@@ -1,12 +1,11 @@
-# Virtual environment
-.venv/
-
-# Secrets
 .env
-
-# Python cache
+.venv/
 __pycache__/
 *.pyc
-
-# VS Code settings
 .vscode/
+backend/.env
+frontend/.env
+frontend/node_modules/
+frontend/dist/
+backend/uploads/
+*.tsbuildinfo

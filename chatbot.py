@@ -20,7 +20,7 @@ FOLLOW_UP_TERMS = {"detail", "detailed", "explain", "explanation", "above", "mor
 GREETING_WORDS = {"hi", "hello", "hey", "hii", "hiii", "hola"}
 
 DETAILED_LOCAL_ANSWERS = {
-    "python": """🐍 **Python — detailed explanation**
+    "python": """[Python — detailed explanation]
 
 Python is a high-level, general-purpose programming language. It is popular with beginners because its syntax is clear and close to English, while still being powerful enough for professional applications.
 
@@ -47,7 +47,7 @@ python filename.py
 ```
 
 Start by learning variables, conditions, loops, functions, lists, dictionaries, and file handling.""",
-    "module": """📦 **Python modules — detailed explanation**
+    "module": """[Python modules — detailed explanation]
 
 A **module** is simply a Python file (`.py`) that contains reusable code: functions, classes, variables, or constants. Instead of writing the same code again in every program, you put it in a module and import what you need.
 
@@ -103,6 +103,11 @@ def _matches_topic(text, topic):
     return re.search(pattern, text) is not None
 
 
+def _clean_local_answer(answer):
+    """Remove legacy leading emoji markers from local lesson text."""
+    return re.sub(r"^[^\w\s]+\s+", "", answer)
+
+
 def _is_python_question(text):
     """Return True for Python terms, including short forms such as 'py'."""
     words = set(re.findall(r"[a-z0-9_+#.-]+", text))
@@ -155,7 +160,7 @@ def _python_overview_request(text):
     return words <= allowed_words
 
 
-def get_response(user_input, history=None):
+def get_response(user_input, history=None, attached_files=None):
     """
     Hybrid chatbot brain:
     1. Check if question is Python-related
@@ -165,11 +170,14 @@ def get_response(user_input, history=None):
     
     user_input_lower = user_input.lower().strip()
     history = history or []
+    attached_files = attached_files or []
     follow_up_topic = _previous_topic(history) if _is_follow_up(user_input_lower) else None
     effective_input = f"{follow_up_topic} {user_input_lower}" if follow_up_topic else user_input_lower
+    if attached_files:
+        effective_input = f"python code {effective_input}"
 
     if _is_greeting(user_input_lower):
-        return "👋 Hi! I’m PyGuide. Ask me anything about Python—variables, loops, functions, modules, or beginner programs."
+        return "[Hello] I’m PyGuide. Ask me anything about Python—variables, loops, functions, modules, or beginner programs."
     
     # --- Step 1: Domain Filter ---
     is_python = _is_python_question(effective_input)
@@ -186,7 +194,7 @@ def get_response(user_input, history=None):
         if _wants_detailed_explanation(user_input_lower):
             return DETAILED_LOCAL_ANSWERS["python"]
         return (
-            "🐍 **Python** is a beginner-friendly programming language used for "
+            "[Python] Python is a beginner-friendly programming language used for "
             "web development, automation, data science, AI, and more.\n\n"
             "Example:\n```python\nprint(\"Hello, Python!\")\n```"
         )
@@ -198,7 +206,7 @@ def get_response(user_input, history=None):
             if _wants_detailed_explanation(user_input_lower) and keyword in DETAILED_LOCAL_ANSWERS:
                 return DETAILED_LOCAL_ANSWERS[keyword]
             if not (follow_up_topic and _is_follow_up(user_input_lower)):
-                return answer
+                return _clean_local_answer(answer)
     
     # --- Step 3: OpenRouter AI Fallback ---
     api_key = os.getenv("OPENROUTER_API_KEY")
@@ -209,7 +217,9 @@ def get_response(user_input, history=None):
     try:
         client = OpenAI(
             base_url=OPENROUTER_BASE_URL,
-            api_key=api_key
+            api_key=api_key,
+            timeout=20.0,
+            max_retries=0,
         )
         
         response = client.chat.completions.create(
@@ -243,12 +253,12 @@ def get_response(user_input, history=None):
     except Exception:
         if follow_up_topic in DETAILED_LOCAL_ANSWERS:
             return (
-                "⚠️ The AI service is temporarily unavailable. Here is a detailed explanation "
+                "[Service unavailable] Here is a detailed explanation "
                 "of the topic you were discussing:\n\n"
                 + DETAILED_LOCAL_ANSWERS[follow_up_topic]
             )
         return (
-            "⚠️ I couldn't reach the AI service right now. "
+            "[Service unavailable] I couldn't reach the AI service right now. "
             "Please try again in a moment.\n\n"
             + UNKNOWN_PYTHON_RESPONSE
         )

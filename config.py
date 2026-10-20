@@ -3,8 +3,8 @@
 # ============================================
 
 # --- App Settings ---
-APP_TITLE = "🐍 Python Learning Assistant"
-APP_ICON = "🐍"
+APP_TITLE = "Python Learning Assistant"
+APP_ICON = "<>"
 APP_DESCRIPTION = "Welcome! Ask me anything about Python programming."
 PAGE_LAYOUT = "centered"
 
@@ -77,8 +77,8 @@ KNOWLEDGE_BASE = {
 }
 
 # --- Response Messages ---
-NON_PYTHON_RESPONSE = "🚫 I only answer Python programming questions. Please ask something related to Python! 🐍"
-UNKNOWN_PYTHON_RESPONSE = "🐍 That's a Python question! I don't have a detailed answer for that specific topic yet, but I'm learning.\n\nTry asking about: variables, loops, functions, lists, tuples, dictionaries, classes, inheritance, or exceptions."
+NON_PYTHON_RESPONSE = "This assistant is focused on Python programming. Ask about Python code, concepts, errors, libraries, or an attached Python file."
+UNKNOWN_PYTHON_RESPONSE = "I understand this is a Python question, but I do not have a local answer for it yet. Try asking about variables, loops, functions, lists, tuples, dictionaries, classes, inheritance, or exceptions."
 
 # --- OpenRouter API Settings ---
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
