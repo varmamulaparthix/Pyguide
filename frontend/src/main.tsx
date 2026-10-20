@@ -1,6 +1,6 @@
 import { ChangeEvent, KeyboardEvent as ReactKeyboardEvent, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Archive, ChevronLeft, Copy, Download, FileCode2, FileText, FolderOpen, LogOut, Menu, MoreHorizontal, Paperclip, Plus, Search, Send, Settings, Trash2, X } from "lucide-react";
+import { Archive, ChevronLeft, Copy, Download, FileCode2, FileText, FolderOpen, LogOut, Menu, MoreHorizontal, Paperclip, Pencil, Plus, Search, Send, Settings, Trash2, X } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import "./style.css";
@@ -61,6 +61,8 @@ function App() {
   const [fileMenu, setFileMenu] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [archivedChats, setArchivedChats] = useState<Chat[]>([]);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -102,11 +104,8 @@ function App() {
       setActive(chat); setMessages(await api(`/chats/${chat.id}/messages`)); setSidebarOpen(false);
     } catch (reason: any) { setError(reason.message); }
   };
-  const newChat = async () => {
-    try {
-      const chat = await api("/chats", { method: "POST", body: JSON.stringify({ title: "New chat" }) });
-      setChats((current) => [chat, ...current]); await openChat(chat);
-    } catch (reason: any) { setError(reason.message); }
+  const newChat = () => {
+    setActive(null); setMessages([]); setText(""); setAttachments([]); setError(""); setSidebarOpen(false);
   };
   const renameChat = async (chat: Chat) => {
     const title = window.prompt("Rename conversation", chat.title)?.trim();
@@ -129,6 +128,17 @@ function App() {
   const deleteChat = async (chat: Chat) => {
     if (!window.confirm(`Delete “${chat.title}”? This permanently removes its messages.`)) return;
     try { await api(`/chats/${chat.id}`, { method: "DELETE" }); setChatMenu(null); if (active?.id === chat.id) { setActive(null); setMessages([]); } await loadChats(); } catch (reason: any) { setError(reason.message); }
+  };
+  const saveEditedMessage = async () => {
+    const content = editingText.trim();
+    if (!content || !editingMessageId) return;
+    try {
+      setLoading(true); setError("");
+      await api(`/messages/${editingMessageId}/edit-and-ask`, { method: "POST", body: JSON.stringify({ content }) });
+      if (active) setMessages(await api(`/chats/${active.id}/messages`));
+      setEditingMessageId(null); setEditingText("");
+      void loadChats();
+    } catch (reason: any) { setError(reason.message); } finally { setLoading(false); }
   };
   const authenticate = async (login: boolean) => {
     setError("");
@@ -190,7 +200,7 @@ function App() {
       pendingMessageId = crypto.randomUUID();
       setMessages((items) => [...items, { id: pendingMessageId, role: "user", content, attachment_names: selected.map((item) => item.name), created_at: new Date().toISOString() }]);
       const result = await api(`/chats/${chat.id}/ask`, { method: "POST", body: JSON.stringify({ content, attachment_ids: selected.map((item) => item.id) }) });
-      setMessages((items) => [...items, { role: "assistant", content: result.content, created_at: new Date().toISOString() }]);
+      setMessages((items) => [...items.map((message) => message.id === pendingMessageId ? { ...message, id: result.user_message_id || message.id } : message), { id: result.assistant_message_id, role: "assistant", content: result.content, created_at: new Date().toISOString() }]);
       void loadChats().catch((reason: any) => setError(reason.message));
     } catch (reason: any) { setMessages((items) => items.filter((message) => message.id !== pendingMessageId)); setError(reason.message); setText(content); setAttachments(selected); } finally { setLoading(false); }
   };
@@ -213,7 +223,7 @@ function App() {
       <header><button className="icon sidebar-toggle" title="Expand sidebar" onClick={() => { setSidebarCollapsed(false); setSidebarOpen(true); }}><Menu /></button><div className="header-title"><h2>PyGuide <i className={online ? "online" : "offline"}>{online ? "● Online" : "● Offline"}</i></h2><small>Python Learning Assistant &nbsp;|&nbsp; Ask anything about Python, coding, or errors</small></div><label className="search"><Search /><input value={query} onChange={(event) => { setQuery(event.target.value); loadChats(event.target.value).catch((reason) => setError(reason.message)); }} placeholder="Search chats..." /></label><button className="icon" title="Settings" onClick={openSettings}><Settings /></button></header>
       <section className="messages">
         {!active && !messages.length ? <div className="welcome"><h1>Let’s make Python click.</h1><p>Learn Python step by step. Ask questions, explore examples, and understand your code.</p><div><button onClick={() => setText("Explain Python variables with examples.")}>Explain a Python concept</button><button onClick={() => setText("Write a beginner Python program.")}>Write a beginner program</button></div></div> :
-          messages.map((message, index) => <article key={message.id || index} className={message.role}><div className="bubble"><ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>{message.attachment_names?.length ? <div className="sent-attachments">{message.attachment_names.map((name) => <span key={name}><Paperclip />{name}</span>)}</div> : null}<div className="message-footer"><small>{new Date(message.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</small><button title="Copy message" onClick={() => navigator.clipboard.writeText(message.content)}><Copy /></button></div></div></article>)}
+          messages.map((message, index) => <article key={message.id || index} className={message.role}><div className="bubble">{editingMessageId === message.id ? <div className="edit-message"><textarea value={editingText} onChange={(event) => setEditingText(event.target.value)} autoFocus /><div><button className="save-edit" onClick={saveEditedMessage} disabled={loading || !editingText.trim()}>Save & regenerate</button><button onClick={() => { setEditingMessageId(null); setEditingText(""); }}>Cancel</button></div></div> : <><ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>{message.attachment_names?.length ? <div className="sent-attachments">{message.attachment_names.map((name) => <span key={name}><Paperclip />{name}</span>)}</div> : null}<div className="message-footer"><small>{new Date(message.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</small>{message.role === "user" && message.id && !loading && <button title="Edit message" onClick={() => { setEditingMessageId(message.id || null); setEditingText(message.content); }}><Pencil /></button>}<button title="Copy message" onClick={() => navigator.clipboard.writeText(message.content)}><Copy /></button></div></>}</div></article>)}
         {loading && <article className="assistant"><div className="typing"><span /><span /><span /> Working…</div></article>}
       </section>
       <div className="composer-wrap">

@@ -102,6 +102,10 @@ class ArchiveRequest(BaseModel):
     archived: bool
 
 
+class EditMessageRequest(BaseModel):
+    content: str = Field(min_length=1, max_length=12000)
+
+
 @app.on_event("startup")
 def initialise_database():
     statements = [
@@ -219,6 +223,35 @@ def delete_chat(chat_id: str, user=Depends(current_user)):
     return {"ok": True}
 
 
+@app.post("/messages/{message_id}/edit-and-ask")
+def edit_and_regenerate(message_id: str, payload: EditMessageRequest, user=Depends(current_user)):
+    """Replace a user message and discard its obsolete response branch."""
+    content = payload.content.strip()
+    with db() as connection:
+        message = connection.execute(
+            """SELECT m.*, c.user_id FROM pyguide_messages m
+            JOIN pyguide_chats c ON c.id=m.chat_id
+            WHERE m.id=%s AND c.user_id=%s""", (message_id, user["id"])
+        ).fetchone()
+        if not message or message["role"] != "user":
+            raise HTTPException(404, "The message could not be edited.")
+        history = connection.execute(
+            "SELECT role,content FROM pyguide_messages WHERE chat_id=%s AND created_at < %s ORDER BY created_at DESC LIMIT 8",
+            (message["chat_id"], message["created_at"]),
+        ).fetchall()[::-1]
+        connection.execute("UPDATE pyguide_messages SET content=%s WHERE id=%s", (content, message_id))
+        connection.execute("DELETE FROM pyguide_messages WHERE chat_id=%s AND created_at > %s", (message["chat_id"], message["created_at"]))
+    try:
+        answer = get_response(content, history=history)
+    except Exception as exc:
+        raise HTTPException(503, "The AI service is unavailable right now. Please try again shortly.") from exc
+    assistant_id = uuid.uuid4()
+    with db() as connection:
+        connection.execute("INSERT INTO pyguide_messages(id,chat_id,role,content) VALUES(%s,%s,'assistant',%s)", (assistant_id, message["chat_id"], answer))
+        connection.execute("UPDATE pyguide_chats SET updated_at=now() WHERE id=%s", (message["chat_id"],))
+    return {"content": answer, "assistant_message_id": assistant_id}
+
+
 @app.post("/attachments")
 async def upload_attachments(files: list[UploadFile] = File(...), user=Depends(current_user)):
     if len(files) > 8:
@@ -309,7 +342,8 @@ def ask(chat_id: str, payload: AskRequest, user=Depends(current_user)):
         answer = get_response(content + (f"\n\n{file_context}" if file_context else ""), history=history)
     except Exception as exc:
         raise HTTPException(503, "The AI service is unavailable right now. Please try again shortly.") from exc
+    assistant_id = uuid.uuid4()
     with db() as connection:
-        connection.execute("INSERT INTO pyguide_messages(id,chat_id,role,content) VALUES(%s,%s,'assistant',%s)", (uuid.uuid4(), chat_id, answer))
+        connection.execute("INSERT INTO pyguide_messages(id,chat_id,role,content) VALUES(%s,%s,'assistant',%s)", (assistant_id, chat_id, answer))
         connection.execute("UPDATE pyguide_chats SET updated_at=now() WHERE id=%s", (chat_id,))
-    return {"content": answer}
+    return {"content": answer, "user_message_id": message_id, "assistant_message_id": assistant_id}
