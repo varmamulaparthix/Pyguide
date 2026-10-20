@@ -71,6 +71,13 @@ main{display:flex;flex:1;flex-direction:column;min-width:0}header{display:flex;a
   .login>button{width:100%;min-height:50px;font-size:15px}.login .secondary{background:#303443}
 }
 @media(max-width:420px){.login-shell{padding:20px 18px}.login{gap:14px;padding:24px 18px}.login-logo{margin-bottom:3px}.login h1{font-size:24px}.login>p{font-size:13px}}
+/* Password visibility controls sit quietly inside both input borders. */
+.password-field{display:flex;align-items:center;min-width:0;border:1px solid #3b4052;border-radius:10px;background:#171a25;overflow:hidden}
+.login .password-field input{flex:1;min-width:0;border:0;border-radius:0;background:transparent;outline:0}
+.password-field button{position:static;flex:none;display:grid;place-items:center;width:46px;min-width:46px;height:46px;min-height:46px;margin:0;padding:0;color:#aeb5c5;background:transparent;border:0;border-radius:0;box-shadow:none}
+.password-field button:hover{color:#f4f5fa;background:#ffffff0a}
+.password-field button:focus-visible{outline:2px solid #9b8dff;outline-offset:-3px}
+.password-field svg{width:19px;height:19px}
 @media(max-width:1024px){
   .composer-wrap{padding:9px 12px calc(9px + env(safe-area-inset-bottom))}
   .composer{display:grid;grid-template-columns:48px minmax(0,1fr) 48px;align-items:stretch;gap:8px;width:100%;padding:0}
